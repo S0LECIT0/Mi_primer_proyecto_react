@@ -142,9 +142,11 @@ export default function AdminProducts() {
   const handleOpenCreate = () => {
     setIsEditing(false)
     setSelectedProduct(null)
+    // Tomamos siempre el id de la primera categoría disponible (ya cargada)
+    const primeraCatId = categories.length > 0 ? String(categories[0].id) : ''
     setFormData({
       nombre: '',
-      categoria_id: categories[0]?.id ? String(categories[0].id) : '',
+      categoria_id: primeraCatId,
       precio: '',
       stock: '10',
       descripcion: '',
@@ -180,8 +182,20 @@ export default function AdminProducts() {
     const numStock = Number(formData.stock)
     const catId = Number(formData.categoria_id)
 
-    if (!nombreTrim || !descTrim || !formData.precio || !catId) {
-      setToast({ message: 'Todos los campos son obligatorios.', type: 'error' })
+    if (!nombreTrim) {
+      setToast({ message: 'El nombre del postre es obligatorio.', type: 'error' })
+      return
+    }
+    if (!catId) {
+      setToast({ message: 'Debes seleccionar una categoría.', type: 'error' })
+      return
+    }
+    if (!formData.precio) {
+      setToast({ message: 'El precio es obligatorio.', type: 'error' })
+      return
+    }
+    if (!descTrim) {
+      setToast({ message: 'La descripción es obligatoria.', type: 'error' })
       return
     }
 
@@ -508,6 +522,9 @@ export default function AdminProducts() {
                     required
                     className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink"
                   >
+                    {formData.categoria_id === '' && (
+                      <option value="" disabled>— Selecciona una categoría —</option>
+                    )}
                     {categories.map((c) => (
                       <option key={c.id} value={String(c.id)}>{c.nombre}</option>
                     ))}

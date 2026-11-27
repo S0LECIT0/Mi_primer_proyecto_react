@@ -80,7 +80,7 @@ class Producto(Base):
     precio = Column(Numeric(10, 2), nullable=False)
     stock = Column(Integer, default=0, nullable=False)
     categoria_id = Column(Integer, ForeignKey("categorias.id", ondelete="RESTRICT"), nullable=False, index=True)
-    imagen_url = Column(String(255), nullable=True)
+    imagen_url = Column(String(500), nullable=True)
     activo = Column(Boolean, default=True, nullable=False, index=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
