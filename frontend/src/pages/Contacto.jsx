@@ -130,7 +130,7 @@ export default function Contacto() {
                   </span>
                   <div>
                     <h4 className="font-semibold text-xs text-logo-brown">WhatsApp Directo</h4>
-                    <p className="text-[11px] sm:text-xs text-logo-brownLight mt-0.5">+57 312 890 4521</p>
+                    <p className="text-[11px] sm:text-xs text-logo-brownLight mt-0.5">+57 3127954956</p>
                   </div>
                 </div>
 
