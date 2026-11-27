@@ -103,18 +103,29 @@ const testimonios = [
   },
 ]
 
-// ─── Productos destacados (mini preview) ─────────────────────────────────────
+// ─── Imágenes locales para fallback ──────────────────────────────────────────
 import arequipe from '../assets/images/arequipe.jpg'
-import fresa from '../assets/images/fresa.jpg'
-import tiramisu from '../assets/images/tiramisu.png'
+import cafe from '../assets/images/cafe.jpg'
 import chocolate from '../assets/images/chocolate.jpg'
+import durazno from '../assets/images/durazno.png'
+import flan from '../assets/images/flan.jpg'
+import fresa from '../assets/images/fresa.jpg'
+import maracuya from '../assets/images/maracuya.jpg'
+import oreo from '../assets/images/oreo.jpg'
+import tiramisu from '../assets/images/tiramisu.png'
+import treLeches from '../assets/images/tres_leches.jpg'
+import { productService } from '../services/api'
 
-const destacados = [
-  { nombre: 'Torta de Arequipe', categoria: 'Tortas Artesanales', precio: '$55.000', img: arequipe },
-  { nombre: 'Tarta de Fresa', categoria: 'Tartas & Cheesecakes', precio: '$48.000', img: fresa },
-  { nombre: 'Tiramisú Clásico', categoria: 'Postres Tradicionales', precio: '$35.000', img: tiramisu },
-  { nombre: 'Torta de Chocolate', categoria: 'Café & Chocolate', precio: '$52.000', img: chocolate },
-]
+const imagenesLocales = { arequipe, cafe, chocolate, durazno, flan, fresa, maracuya, oreo, tiramisu, tres_leches: treLeches }
+
+function resolverImagen(url) {
+  if (!url) return chocolate
+  for (const key of Object.keys(imagenesLocales)) {
+    if (url.includes(key)) return imagenesLocales[key]
+  }
+  if (url.startsWith('http')) return url
+  return chocolate
+}
 
 // ─── Componente HeroCarousel ──────────────────────────────────────────────────
 function HeroCarousel() {
@@ -257,6 +268,16 @@ function HeroCarousel() {
 
 // ─── Componente principal Index ───────────────────────────────────────────────
 export default function Index() {
+  const [destacados, setDestacados] = useState([])
+
+  useEffect(() => {
+    productService.getAll({ solo_activos: true }).then((res) => {
+      if (res.ok && Array.isArray(res.data)) {
+        // Mostrar los primeros 4 productos activos como destacados
+        setDestacados(res.data.slice(0, 4))
+      }
+    })
+  }, [])
   return (
     <div className="min-h-screen flex flex-col bg-logo-vanilla text-logo-brown">
       <Header />
@@ -343,24 +364,24 @@ export default function Index() {
               <p className="text-sm text-logo-brownLight">Los más pedidos por nuestra comunidad de dulce-amantes.</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-              {destacados.map((p, i) => (
+              {destacados.map((p) => (
                 <Link
-                  key={i}
+                  key={p.id}
                   to="/productos"
                   className="group rounded-2xl overflow-hidden border border-logo-pink/20 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1.5 transition-all duration-300"
                 >
                   <div className="relative h-36 sm:h-44 overflow-hidden">
                     <img
-                      src={p.img}
+                      src={resolverImagen(p.imagen_url)}
                       alt={p.nombre}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   </div>
                   <div className="p-3 sm:p-4">
-                    <span className="text-[10px] text-logo-pink font-semibold uppercase tracking-wider">{p.categoria}</span>
+                    <span className="text-[10px] text-logo-pink font-semibold uppercase tracking-wider">{p.categoria?.nombre}</span>
                     <p className="font-display font-bold text-sm text-logo-brown mt-0.5 line-clamp-2">{p.nombre}</p>
-                    <p className="text-logo-pinkHover font-bold text-sm mt-1">{p.precio}</p>
+                    <p className="text-logo-pinkHover font-bold text-sm mt-1">${Number(p.precio).toLocaleString('es-CO')}</p>
                   </div>
                 </Link>
               ))}

@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import WhatsAppButton from '../components/WhatsAppButton'
+import { productService } from '../services/api'
 
-// ─── Imágenes locales ──────────────────────────────────────────────────────────
+// ─── Imágenes locales (fallback) ──────────────────────────────────────────────
 import arequipe from '../assets/images/arequipe.jpg'
 import cafe from '../assets/images/cafe.jpg'
 import chocolate from '../assets/images/chocolate.jpg'
@@ -16,130 +17,23 @@ import oreo from '../assets/images/oreo.jpg'
 import tiramisu from '../assets/images/tiramisu.png'
 import treLeches from '../assets/images/tres_leches.jpg'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CATÁLOGO DE PRODUCTOS
-// Para agregar un nuevo producto: copia un objeto del array, cambia sus datos
-// y agrégalo en la categoría correspondiente (misma cadena en "categoria").
-// Para crear una nueva categoría: usa un nombre nuevo en "categoria".
+const imagenesLocales = { arequipe, cafe, chocolate, durazno, flan, fresa, maracuya, oreo, tiramisu, tres_leches: treLeches }
+
+function resolverImagen(url) {
+  if (!url) return chocolate
+  for (const key of Object.keys(imagenesLocales)) {
+    if (url.includes(key)) return imagenesLocales[key]
+  }
+  if (url.startsWith('http')) return url
+  return chocolate
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 const TODOS = 'Todos'
 
-const productos = [
-  // ── Tortas Artesanales ───────────────────────────────────────────────────
-  {
-    id: 1,
-    nombre: 'Torta de Arequipe',
-    categoria: 'Tortas Artesanales',
-    descripcion: 'Suave bizcocho de vainilla relleno con arequipe artesanal casero y cubierto con crema batida. Un clásico irresistible.',
-    precio: 55000,
-    porciones: '8–10 porciones',
-    img: arequipe,
-    etiqueta: '⭐ Más Pedida',
-  },
-  {
-    id: 2,
-    nombre: 'Torta de Chocolate',
-    categoria: 'Tortas Artesanales',
-    descripcion: 'Húmedo bizcocho de cacao intenso con ganache de chocolate negro belga. Para los amantes del chocolate puro.',
-    precio: 52000,
-    porciones: '8–10 porciones',
-    img: chocolate,
-    etiqueta: null,
-  },
-  {
-    id: 3,
-    nombre: 'Torta de Oreo',
-    categoria: 'Tortas Artesanales',
-    descripcion: 'Base de galletas Oreo con mousse de crema y queso crema, decorada con galletas trituradas y crema chantilly.',
-    precio: 58000,
-    porciones: '8–10 porciones',
-    img: oreo,
-    etiqueta: '🆕 Nueva',
-  },
-
-  // ── Tartas & Cheesecakes ─────────────────────────────────────────────────
-  {
-    id: 4,
-    nombre: 'Tarta de Fresa',
-    categoria: 'Tartas & Cheesecakes',
-    descripcion: 'Base crocante de galleta con crema pastelera y fresas frescas de temporada glaseadas con mermelada artesanal.',
-    precio: 48000,
-    porciones: '6–8 porciones',
-    img: fresa,
-    etiqueta: '🍓 Temporada',
-  },
-  {
-    id: 5,
-    nombre: 'Tarta de Durazno',
-    categoria: 'Tartas & Cheesecakes',
-    descripcion: 'Crujiente masa de mantequilla con relleno de crema y láminas de durazno en almíbar con toque de canela.',
-    precio: 46000,
-    porciones: '6–8 porciones',
-    img: durazno,
-    etiqueta: null,
-  },
-  {
-    id: 6,
-    nombre: 'Tarta de Maracuyá',
-    categoria: 'Tartas & Cheesecakes',
-    descripcion: 'Cremoso cheesecake con coulis de maracuyá fresco encima. Equilibrio perfecto entre lo dulce y lo ácido.',
-    precio: 50000,
-    porciones: '6–8 porciones',
-    img: maracuya,
-    etiqueta: '💛 Tropical',
-  },
-
-  // ── Postres Tradicionales ────────────────────────────────────────────────
-  {
-    id: 7,
-    nombre: 'Flan de Caramelo',
-    categoria: 'Postres Tradicionales',
-    descripcion: 'Clásico flan casero de huevo con caramelo dorado. Textura sedosa y suave al paladar, receta de abuela.',
-    precio: 28000,
-    porciones: '4–6 porciones',
-    img: flan,
-    etiqueta: null,
-  },
-  {
-    id: 8,
-    nombre: 'Tres Leches',
-    categoria: 'Postres Tradicionales',
-    descripcion: 'Esponjoso bizcocho empapado en mezcla de leche condensada, evaporada y crema de leche. El postre más amado de la casa.',
-    precio: 42000,
-    porciones: '8–10 porciones',
-    img: treLeches,
-    etiqueta: '❤️ Favorito',
-  },
-
-  // ── Postres de Café & Chocolate ──────────────────────────────────────────
-  {
-    id: 9,
-    nombre: 'Tiramisú Clásico',
-    categoria: 'Postres de Café & Chocolate',
-    descripcion: 'Auténtico tiramisú italiano con dedos de dama remojados en espresso, crema de mascarpone y cacao en polvo.',
-    precio: 35000,
-    porciones: '4–6 porciones',
-    img: tiramisu,
-    etiqueta: '🏆 Premium',
-  },
-  {
-    id: 10,
-    nombre: 'Postre de Café',
-    categoria: 'Postres de Café & Chocolate',
-    descripcion: 'Cremosa mousse de café con trozos de brownie, cubierta con crema batida y decorada con granos de café tostado.',
-    precio: 32000,
-    porciones: '4–6 porciones',
-    img: cafe,
-    etiqueta: null,
-  },
-]
-
-// ── Derivar categorías únicas del array ──────────────────────────────────────
-const categorias = [TODOS, ...Array.from(new Set(productos.map((p) => p.categoria)))]
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatPrecio = (n) =>
-  '$' + n.toLocaleString('es-CO') + ' COP'
+  '$' + Number(n).toLocaleString('es-CO') + ' COP'
 
 // ── Colores por categoría ─────────────────────────────────────────────────────
 const badgeColor = {
@@ -151,12 +45,26 @@ const badgeColor = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Productos() {
+  const [productos, setProductos] = useState([])
+  const [loading, setLoading] = useState(true)
   const [categoriaActiva, setCategoriaActiva] = useState(TODOS)
   const [busqueda, setBusqueda] = useState('')
 
+  useEffect(() => {
+    productService.getAll({ solo_activos: true }).then((res) => {
+      if (res.ok && Array.isArray(res.data)) {
+        setProductos(res.data)
+      }
+      setLoading(false)
+    })
+  }, [])
+
+  // Categorías únicas desde la API
+  const categorias = [TODOS, ...Array.from(new Set(productos.map((p) => p.categoria?.nombre).filter(Boolean)))]
+
   const filtrados = productos.filter((p) => {
     const coincideCategoria =
-      categoriaActiva === TODOS || p.categoria === categoriaActiva
+      categoriaActiva === TODOS || p.categoria?.nombre === categoriaActiva
     const coincideBusqueda =
       busqueda.trim() === '' ||
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -167,7 +75,7 @@ export default function Productos() {
   // Agrupar por categoría para la vista "Todos"
   const grupos =
     categoriaActiva === TODOS
-      ? categorias.slice(1) // sin "Todos"
+      ? categorias.slice(1)
       : [categoriaActiva]
 
   return (
@@ -239,7 +147,12 @@ export default function Productos() {
         {/* ── Contenido del catálogo ──────────────────────────────────────── */}
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
 
-          {filtrados.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-24 text-logo-brownLight">
+              <span className="text-5xl block mb-4 animate-bounce">🧁</span>
+              <p className="text-sm">Cargando productos...</p>
+            </div>
+          ) : filtrados.length === 0 ? (
             <div className="text-center py-24 text-logo-brownLight">
               <span className="text-5xl block mb-4">🔍</span>
               <p className="font-display text-lg font-semibold text-logo-brown">No encontramos "{busqueda}"</p>
@@ -254,7 +167,7 @@ export default function Productos() {
           ) : (
             grupos.map((grupo) => {
               const items = filtrados.filter(
-                (p) => categoriaActiva !== TODOS || p.categoria === grupo
+                (p) => categoriaActiva !== TODOS || p.categoria?.nombre === grupo
               )
               if (items.length === 0) return null
               return (
@@ -282,27 +195,20 @@ export default function Productos() {
                         {/* Imagen */}
                         <div className="relative h-48 sm:h-56 overflow-hidden">
                           <img
-                            src={producto.img}
+                            src={resolverImagen(producto.imagen_url)}
                             alt={producto.nombre}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                           {/* Overlay suave */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
 
-                          {/* Etiqueta especial */}
-                          {producto.etiqueta && (
-                            <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/90 text-logo-brown text-[11px] font-bold shadow-sm">
-                              {producto.etiqueta}
-                            </span>
-                          )}
-
                           {/* Badge de categoría */}
                           <span
                             className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                              badgeColor[producto.categoria] || 'bg-logo-pink/20 text-logo-brown'
+                              badgeColor[producto.categoria?.nombre] || 'bg-logo-pink/20 text-logo-brown'
                             }`}
                           >
-                            {producto.categoria}
+                            {producto.categoria?.nombre}
                           </span>
                         </div>
 
@@ -320,7 +226,6 @@ export default function Productos() {
                               <p className="text-logo-pinkHover font-bold text-base">
                                 {formatPrecio(producto.precio)}
                               </p>
-                              <p className="text-[10px] text-logo-brownLight/70">{producto.porciones}</p>
                             </div>
                             <a
                               href={`https://wa.me/573128904521?text=Hola,%20quiero%20pedir%20${encodeURIComponent(producto.nombre)}`}
@@ -341,7 +246,7 @@ export default function Productos() {
           )}
 
           {/* Resumen de resultados */}
-          {filtrados.length > 0 && (
+          {!loading && filtrados.length > 0 && (
             <p className="text-center text-xs text-logo-brownLight/70 mt-4">
               Mostrando {filtrados.length} de {productos.length} productos
             </p>
