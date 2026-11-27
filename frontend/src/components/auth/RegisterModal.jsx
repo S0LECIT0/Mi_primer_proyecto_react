@@ -1,19 +1,21 @@
 import React, { useState } from 'react'
 import { authService } from '../../services/api'
 
+const INITIAL_FORM_DATA = {
+  nombre: '',
+  apellido: '',
+  tipoDocumento: 'CC',
+  numeroDocumento: '',
+  direccion: '',
+  telefono: '',
+  correo: '',
+  password: '',
+  confirmPassword: '',
+  aceptaTratamiento: false
+}
+
 export default function RegisterModal({ isOpen, onClose, onSuccessRegister }) {
-  const [formData, setFormData] = useState({
-    nombre: '',
-    apellido: '',
-    tipoDocumento: 'CC',
-    numeroDocumento: '',
-    direccion: '',
-    telefono: '',
-    correo: '',
-    password: '',
-    confirmPassword: '',
-    aceptaTratamiento: false
-  })
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA)
 
   const [touched, setTouched] = useState({})
   const [showPassword, setShowPassword] = useState(false)
@@ -121,68 +123,33 @@ export default function RegisterModal({ isOpen, onClose, onSuccessRegister }) {
 
     setLoading(true)
 
-    // Datos limpios del formulario
-    const newUser = {
-      ...formData,
+    const payload = {
       nombre: nombreTrim,
       apellido: apellidoTrim,
+      tipoDocumento: formData.tipoDocumento,
       numeroDocumento: docTrim,
       direccion: direccionTrim,
       telefono: formData.telefono.trim(),
       correo: correoTrim.toLowerCase(),
-      id: Date.now(),
-      rol: 'Cliente',
-      fechaRegistro: new Date().toISOString()
+      password: formData.password
     }
 
-    // 1. Intentar registrar en FastAPI / Neon Tech
-    const apiRes = await authService.register(newUser)
-
-    if (apiRes.ok) {
-      // Guardar también en localStorage para consistencia offline
-      const existingUsers = JSON.parse(localStorage.getItem('dulce_delicia_users') || '[]')
-      existingUsers.push(newUser)
-      localStorage.setItem('dulce_delicia_users', JSON.stringify(existingUsers))
-
-      setLoading(false)
-      setRegistroExitoso(true)
-      setTimeout(() => {
-        setRegistroExitoso(false)
-        onSuccessRegister?.(correoTrim.toLowerCase())
-        onClose()
-      }, 1600)
-      return
-    }
-
-    // Si falló por error de validación del servidor (ej. email o documento duplicado)
-    if (apiRes.error && !apiRes.error.includes('conexión') && !apiRes.error.includes('Failed to fetch')) {
-      setLoading(false)
-      setServerError(apiRes.error)
-      return
-    }
-
-    // 2. Si el servidor FastAPI no está corriendo, registrar localmente
-    const existingUsers = JSON.parse(localStorage.getItem('dulce_delicia_users') || '[]')
-    const alreadyExists = existingUsers.some(
-      (u) => (u.correo || u.email || '').toLowerCase() === correoTrim.toLowerCase()
-    )
-
-    if (alreadyExists) {
-      setLoading(false)
-      setServerError('Ya existe una cuenta registrada con este correo electrónico.')
-      return
-    }
-
-    existingUsers.push(newUser)
-    localStorage.setItem('dulce_delicia_users', JSON.stringify(existingUsers))
-
+    const apiRes = await authService.register(payload)
     setLoading(false)
+
+    if (!apiRes.ok) {
+      setServerError(apiRes.error || 'No fue posible completar el registro en el servidor.')
+      return
+    }
+
     setRegistroExitoso(true)
     setTimeout(() => {
       setRegistroExitoso(false)
+      setFormData(INITIAL_FORM_DATA)
+      setTouched({})
       onSuccessRegister?.(correoTrim.toLowerCase())
       onClose()
-    }, 1600)
+    }, 1500)
   }
 
   return (
@@ -572,7 +539,7 @@ export default function RegisterModal({ isOpen, onClose, onSuccessRegister }) {
                   : 'bg-gray-300 cursor-not-allowed'
               }`}
             >
-              {loading ? 'Registrando en servidor...' : 'Crear cuenta'}
+              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </div>
 

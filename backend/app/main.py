@@ -5,11 +5,13 @@ from app.config import settings
 from app.database import engine, Base
 from app.routers import auth, users, products, categories, orders
 
-# Inicializar aplicación FastAPI
+# Inicializar aplicación FastAPI con Swagger UI en /docs
 app = FastAPI(
     title="Dulce Delicia Repostería API",
     description="Backend RESTful para la pastelería artesanal Dulce Delicia con autenticación JWT, control de roles (RBAC), catálogo de postres y gestión de pedidos.",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Configurar Middleware CORS para permitir solicitudes del Frontend React (Vite)
@@ -32,16 +34,12 @@ app.include_router(orders.router)
 def read_root():
     return {
         "marca": "Dulce Delicia Repostería Artesanal",
-        "estado": "Servicio Activo",
-        "documentacion": "/docs",
-        "especificacion": "/openapi.json"
+        "estado": "Servicio Activo"
     }
 
 @app.get("/api/health", tags=["General"])
 def health_check():
-    db_tipo = "PostgreSQL (Neon Tech)" if "postgres" in settings.DATABASE_URL else "SQLite Local"
     return {
         "status": "healthy",
-        "motor_bd": db_tipo,
         "timestamp": datetime.utcnow().isoformat()
     }

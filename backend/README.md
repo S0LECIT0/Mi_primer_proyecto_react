@@ -63,11 +63,15 @@ Una vez iniciado el servidor, puedes probar todos los endpoints desde tu navegad
 ### Autenticación (`/api/auth`)
 - `POST /api/auth/register`: Registro de nuevos usuarios con validación de documento y correo único.
 - `POST /api/auth/login`: Inicio de sesión y generación de token JWT.
+- `POST /api/auth/token`: Flujo OAuth2 Password para pruebas en Swagger UI (`/docs`).
+- `POST /api/auth/recover-password`: Generación de token temporal JWT para recuperación de contraseña.
+- `POST /api/auth/reset-password`: Restablecimiento de contraseña encriptada con bcrypt.
 - `GET /api/auth/me`: Datos del usuario autenticado actual.
 
 ### Usuarios (`/api/users`)
 - `GET /api/users`: Lista y búsqueda de usuarios (requiere Administrador).
 - `GET /api/users/roles`: Lista de roles del sistema.
+- `POST /api/users`: Creación de usuarios desde el panel administrativo (requiere Administrador).
 - `PUT /api/users/{id}`: Actualización de datos y roles.
 - `DELETE /api/users/{id}`: Eliminación o desactivación segura.
 

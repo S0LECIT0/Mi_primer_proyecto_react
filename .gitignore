@@ -1,8 +1,30 @@
-node_modules
-dist
-build
+# Node / Vite
+node_modules/
+dist/
+build/
+*.log
+
+# Entornos y Secretos
 .env
 .env.local
-.vscode
+.env.*.local
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.db
+*.sqlite
+*.sqlite3
+
+# Editores y SO
+.vscode/
+.idea/
 .DS_Store
-*.log
+Thumbs.db

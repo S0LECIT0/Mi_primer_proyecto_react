@@ -52,105 +52,39 @@ export default function Login() {
 
     setLoading(true)
 
-    // 1. Intentar autenticar contra el backend FastAPI (Neon Tech)
+    // Validar credenciales contra FastAPI (bcrypt + JWT)
     const apiRes = await authService.login(email.trim().toLowerCase(), password)
+    setLoading(false)
 
-    if (apiRes.ok && apiRes.data?.access_token) {
-      const u = apiRes.data.user
-      const sessionData = {
-        correo: u.email,
-        nombre: u.nombre,
-        apellido: u.apellido,
-        rol: u.rol?.nombre || (u.rol_id === 1 ? 'Administrador' : u.rol_id === 2 ? 'Empleado' : 'Cliente'),
-        token: apiRes.data.access_token,
-        access_token: apiRes.data.access_token
-      }
-
-      authService.setSession(sessionData, rememberMe)
-      setCurrentUser(sessionData)
-      setLoginSuccess(true)
-      setLoading(false)
-
-      setTimeout(() => {
-        if (sessionData.rol === 'Administrador' || sessionData.rol === 'Empleado') {
-          navigate('/admin')
-        } else {
-          navigate('/')
-        }
-      }, 1200)
+    if (!apiRes.ok || !apiRes.data?.access_token) {
+      setErrorMsg(apiRes.error || 'Correo o contraseña incorrectos.')
       return
     }
 
-    // 2. Si el backend FastAPI no está respondiendo, usar usuarios locales de contingencia
-    const storedUsers = JSON.parse(localStorage.getItem('dulce_delicia_users') || '[]')
-    const demoUsers = [
-      {
-        correo: 'admin@dulcedelicia.com',
-        password: 'Password@2026',
-        nombre: 'Administrador',
-        apellido: 'Dulce Delicia',
-        rol: 'Administrador'
-      },
-      {
-        correo: 'admin@dulcedelicia.com',
-        password: 'Dulce2026*!',
-        nombre: 'Administrador',
-        apellido: 'Dulce Delicia',
-        rol: 'Administrador'
-      },
-      {
-        correo: 'empleado@dulcedelicia.com',
-        password: 'Dulce2026*!',
-        nombre: 'Carlos',
-        apellido: 'Mendoza',
-        rol: 'Empleado'
-      },
-      {
-        correo: 'cliente@dulcedelicia.com',
-        password: 'Dulce2026*!',
-        nombre: 'Sofía',
-        apellido: 'Gómez',
-        rol: 'Cliente'
-      },
-      ...storedUsers
-    ]
-
-    const userFound = demoUsers.find(
-      (u) => (u.correo || u.email || '').toLowerCase() === email.trim().toLowerCase()
-    )
-
-    if (!userFound) {
-      setLoading(false)
-      setErrorMsg(apiRes.error || 'No existe ninguna cuenta registrada con este correo electrónico.')
-      return
-    }
-
-    if (userFound.password !== password) {
-      setLoading(false)
-      setErrorMsg('Contraseña incorrecta. Por favor verifica e intenta nuevamente.')
-      return
-    }
-
+    const u = apiRes.data.user
+    const rolNombre = u.rol?.nombre || (u.rol_id === 1 ? 'Administrador' : u.rol_id === 2 ? 'Empleado' : 'Cliente')
     const sessionData = {
-      correo: userFound.correo || userFound.email,
-      nombre: userFound.nombre,
-      apellido: userFound.apellido,
-      rol: userFound.rol || 'Cliente',
-      token: 'jwt_local_' + Date.now()
+      id: u.id,
+      correo: u.email,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      rol_id: u.rol_id,
+      rol: rolNombre,
+      token: apiRes.data.access_token,
+      access_token: apiRes.data.access_token
     }
 
     authService.setSession(sessionData, rememberMe)
     setCurrentUser(sessionData)
     setLoginSuccess(true)
-    setLoading(false)
 
     setTimeout(() => {
-      if (sessionData.rol === 'Administrador' || sessionData.rol === 'Empleado') {
+      if (rolNombre === 'Administrador' || rolNombre === 'Empleado') {
         navigate('/admin')
       } else {
         navigate('/')
       }
-    }, 1200)
+    }, 900)
   }
 
   const handleRegisteredSuccess = (newEmail) => {

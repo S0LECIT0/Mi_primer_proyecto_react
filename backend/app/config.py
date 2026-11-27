@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+    RESET_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "15"))
     CORS_ORIGINS: str = os.getenv(
         "CORS_ORIGINS", 
         "http://localhost:5173,http://127.0.0.1:5173"

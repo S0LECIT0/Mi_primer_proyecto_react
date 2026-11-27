@@ -2,43 +2,70 @@ import React, { useState, useEffect } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import LogoutModal from '../../components/auth/LogoutModal'
 import logo from '../../assets/logo.jpg'
+import { authService } from '../../services/api'
 
 export default function AdminLayout() {
   const [currentUser, setCurrentUser] = useState(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    // Verificar sesión administrativa
-    const session =
-      localStorage.getItem('dulce_delicia_session') ||
-      sessionStorage.getItem('dulce_delicia_session')
+    let active = true
 
-    if (session) {
-      try {
-        const parsed = JSON.parse(session)
-        setCurrentUser(parsed)
-      } catch (e) {
-        setCurrentUser(null)
+    async function verifySession() {
+      const session = authService.getCurrentSession()
+      if (!session || !(session.access_token || session.token)) {
+        authService.clearSession()
+        navigate('/login', { replace: true })
+        return
       }
-    } else {
-      // Iniciar sesión temporal como Administrador para facilidad de pruebas
-      const defaultAdmin = {
-        correo: 'admin@dulcedelicia.com',
-        nombre: 'Administrador',
-        apellido: 'Dulce Delicia',
-        rol: 'Administrador'
+
+      const profileRes = await authService.getProfile()
+      if (!active) return
+
+      if (!profileRes.ok && !profileRes.isNetworkError) {
+        authService.clearSession()
+        navigate('/login', { replace: true })
+        return
       }
-      localStorage.setItem('dulce_delicia_session', JSON.stringify(defaultAdmin))
-      setCurrentUser(defaultAdmin)
+
+      let resolvedUser = session
+      if (profileRes.ok && profileRes.data) {
+        const u = profileRes.data
+        const rolNombre = u.rol?.nombre || (u.rol_id === 1 ? 'Administrador' : u.rol_id === 2 ? 'Empleado' : 'Cliente')
+        resolvedUser = {
+          ...session,
+          id: u.id,
+          correo: u.email,
+          nombre: u.nombre,
+          apellido: u.apellido,
+          rol_id: u.rol_id,
+          rol: rolNombre
+        }
+        const remembered = Boolean(localStorage.getItem('dulce_delicia_session'))
+        authService.setSession(resolvedUser, remembered)
+      }
+
+      if (resolvedUser.rol !== 'Administrador' && resolvedUser.rol !== 'Empleado') {
+        navigate('/', { replace: true })
+        return
+      }
+
+      setCurrentUser(resolvedUser)
+      setCheckingAuth(false)
     }
-  }, [])
+
+    verifySession()
+    return () => {
+      active = false
+    }
+  }, [navigate])
 
   const handleLogout = () => {
-    localStorage.removeItem('dulce_delicia_session')
-    sessionStorage.removeItem('dulce_delicia_session')
+    authService.clearSession()
     navigate('/login')
   }
 
@@ -47,14 +74,21 @@ export default function AdminLayout() {
       ? 'flex items-center gap-3 px-4 py-3 rounded-2xl bg-logo-pink text-white font-semibold text-sm shadow-sm transition-all'
       : 'flex items-center gap-3 px-4 py-3 rounded-2xl text-logo-brownLight hover:bg-logo-pinkLight/60 hover:text-logo-brown font-medium text-sm transition-all'
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#faf5f0] flex items-center justify-center text-logo-brown text-sm">
+        Verificando sesión y permisos...
+      </div>
+    )
+  }
+
   const isAdmin = currentUser?.rol === 'Administrador'
 
   return (
     <div className="min-h-screen bg-[#faf5f0] text-logo-brown flex">
-      
+
       {/* 1. SIDEBAR FIJO LATERAL (Desktop) */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-logo-pink/20 fixed inset-y-0 left-0 z-30 shadow-sm">
-        {/* Encabezado del Sidebar con Logo */}
         <div className="h-20 flex items-center gap-3 px-6 border-b border-logo-pink/15">
           <img
             src={logo}
@@ -85,7 +119,7 @@ export default function AdminLayout() {
                 ? 'bg-purple-100 text-purple-700'
                 : 'bg-emerald-100 text-emerald-700'
             }`}>
-              {currentUser?.rol || 'Administrador'}
+              {currentUser?.rol}
             </span>
           </div>
         </div>
@@ -97,13 +131,13 @@ export default function AdminLayout() {
             <span>Dashboard</span>
           </NavLink>
 
-          {/* Gestión de Usuarios y Roles (Permiso de Administrador) */}
-          <NavLink to="/admin/usuarios" className={navLinkClass}>
-            <span className="text-lg">👥</span>
-            <span>Usuarios y Roles</span>
-          </NavLink>
+          {isAdmin && (
+            <NavLink to="/admin/usuarios" className={navLinkClass}>
+              <span className="text-lg">👥</span>
+              <span>Usuarios y Roles</span>
+            </NavLink>
+          )}
 
-          {/* Gestión de Productos / Catálogo de Postres */}
           <NavLink to="/admin/productos" className={navLinkClass}>
             <span className="text-lg">🧁</span>
             <span>Catálogo de Postres</span>
@@ -134,14 +168,14 @@ export default function AdminLayout() {
       {/* 2. SIDEBAR MÓVIL DESPLEGABLE */}
       {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div 
+          <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           ></div>
           <div className="relative w-64 max-w-[80vw] bg-white h-full flex flex-col p-4 shadow-2xl z-10 animate-fadeIn">
             <div className="flex items-center justify-between pb-4 border-b border-logo-pink/20 mb-4">
               <span className="font-display font-bold text-base text-logo-brown">Menú Admin</span>
-              <button 
+              <button
                 onClick={() => setMobileSidebarOpen(false)}
                 className="text-gray-500 hover:text-gray-700 p-1 font-bold"
               >
@@ -152,9 +186,11 @@ export default function AdminLayout() {
               <NavLink to="/admin" end onClick={() => setMobileSidebarOpen(false)} className={navLinkClass}>
                 <span>📊</span> <span>Dashboard</span>
               </NavLink>
-              <NavLink to="/admin/usuarios" onClick={() => setMobileSidebarOpen(false)} className={navLinkClass}>
-                <span>👥</span> <span>Usuarios y Roles</span>
-              </NavLink>
+              {isAdmin && (
+                <NavLink to="/admin/usuarios" onClick={() => setMobileSidebarOpen(false)} className={navLinkClass}>
+                  <span>👥</span> <span>Usuarios y Roles</span>
+                </NavLink>
+              )}
               <NavLink to="/admin/productos" onClick={() => setMobileSidebarOpen(false)} className={navLinkClass}>
                 <span>🧁</span> <span>Catálogo de Postres</span>
               </NavLink>
@@ -177,11 +213,8 @@ export default function AdminLayout() {
 
       {/* 3. CONTENEDOR PRINCIPAL */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
-        
-        {/* NAVBAR SUPERIOR FIJO */}
         <header className="sticky top-0 z-20 h-20 bg-white/95 backdrop-blur-md border-b border-logo-pink/20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
-            {/* Botón menú móvil */}
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(true)}
@@ -200,7 +233,7 @@ export default function AdminLayout() {
                 {location.pathname === '/admin/productos' && 'Gestión del Catálogo de Postres'}
               </h2>
               <span className="text-[11px] text-logo-brownLight font-light hidden sm:inline">
-                Dulce Delicia Repostería &bull; Operaciones CRUD activas
+                Dulce Delicia Repostería &bull; Conectado a FastAPI
               </span>
             </div>
           </div>
@@ -208,7 +241,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Sistema Operativo
+              {currentUser?.rol}
             </span>
 
             <div className="w-9 h-9 rounded-full bg-logo-pink/20 text-logo-brown font-bold flex items-center justify-center text-xs border border-logo-pink/30">
@@ -217,13 +250,11 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        {/* ÁREA DE CONTENIDO DINÁMICO */}
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-          <Outlet />
+          <Outlet context={{ currentUser }} />
         </main>
       </div>
 
-      {/* Modal de Confirmación de Cierre de Sesión */}
       <LogoutModal
         isOpen={isLogoutModalOpen}
         onConfirm={handleLogout}

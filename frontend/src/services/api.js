@@ -1,22 +1,36 @@
 // ===================================================================
 // Cliente y Servicios API para Dulce Delicia Repostería
-// Conexión con Backend FastAPI y Base de Datos Neon Tech / PostgreSQL
+// Conexión con Backend FastAPI y Base de Datos PostgreSQL / SQLite
 // ===================================================================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 /**
+ * Extraer mensaje legible desde respuestas de error FastAPI / Pydantic
+ */
+function extractErrorMessage(data, status) {
+  if (Array.isArray(data?.detail)) {
+    return data.detail
+      .map((err) => err?.msg || JSON.stringify(err))
+      .join(' | ')
+  }
+  if (typeof data?.detail === 'string') return data.detail
+  if (typeof data?.message === 'string') return data.message
+  return `Error del servidor (${status})`
+}
+
+/**
  * Obtener token JWT almacenado en sesión activa
  */
 export function getStoredToken() {
-  const session = 
-    localStorage.getItem('dulce_delicia_session') || 
+  const session =
+    localStorage.getItem('dulce_delicia_session') ||
     sessionStorage.getItem('dulce_delicia_session')
   if (!session) return null
   try {
     const parsed = JSON.parse(session)
     return parsed.access_token || parsed.token || null
-  } catch (e) {
+  } catch {
     return null
   }
 }
@@ -46,13 +60,22 @@ export async function apiFetch(endpoint, options = {}) {
     const data = await response.json().catch(() => null)
 
     if (!response.ok) {
-      const errorMsg = data?.detail || data?.message || `Error del servidor (${response.status})`
-      throw new Error(errorMsg)
+      return {
+        ok: false,
+        status: response.status,
+        isNetworkError: false,
+        error: extractErrorMessage(data, response.status)
+      }
     }
 
     return { ok: true, data, status: response.status }
   } catch (error) {
-    return { ok: false, error: error.message || 'Error de conexión con la API' }
+    return {
+      ok: false,
+      status: 0,
+      isNetworkError: true,
+      error: 'No se pudo conectar con el servidor FastAPI. Verifica que el backend esté activo en http://localhost:8000.'
+    }
   }
 }
 
@@ -66,7 +89,7 @@ export const healthService = {
 }
 
 // -------------------------------------------------------------
-// 2. Servicio de Autenticación
+// 2. Servicio de Autenticación y Recuperación
 // -------------------------------------------------------------
 export const authService = {
   async login(email, password) {
@@ -88,8 +111,22 @@ export const authService = {
         direccion: userData.direccion || null,
         email: userData.correo || userData.email,
         password: userData.password,
-        rol_id: userData.rol_id || 3
+        rol_id: 3
       })
+    })
+  },
+
+  async recoverPassword(email) {
+    return await apiFetch('/auth/recover-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    })
+  },
+
+  async resetPassword(token, newPassword) {
+    return await apiFetch('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword })
     })
   },
 
@@ -139,6 +176,13 @@ export const userService = {
 
   async getRoles() {
     return await apiFetch('/users/roles')
+  },
+
+  async create(userData) {
+    return await apiFetch('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    })
   },
 
   async update(id, userData) {
@@ -195,6 +239,39 @@ export const productService = {
 export const categoryService = {
   async getAll() {
     return await apiFetch('/categories')
+  },
+
+  async create(categoryData) {
+    return await apiFetch('/categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData)
+    })
+  }
+}
+
+// -------------------------------------------------------------
+// 6. Servicio de Pedidos
+// -------------------------------------------------------------
+export const orderService = {
+  async getAll(params = {}) {
+    const query = new URLSearchParams()
+    if (params.estado) query.append('estado', params.estado)
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    return await apiFetch(`/orders${qs}`)
+  },
+
+  async create(orderData) {
+    return await apiFetch('/orders', {
+      method: 'POST',
+      body: JSON.stringify(orderData)
+    })
+  },
+
+  async updateStatus(id, estado) {
+    return await apiFetch(`/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado })
+    })
   }
 }
 
@@ -205,5 +282,6 @@ export default {
   userService,
   productService,
   categoryService,
+  orderService,
   healthService
 }

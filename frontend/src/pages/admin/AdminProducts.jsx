@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import ToastAlert from '../../components/admin/ToastAlert'
-import { productService } from '../../services/api'
+import { productService, categoryService } from '../../services/api'
 
-// Importación de las fotos de los 10 postres para previsualización
 import arequipe from '../../assets/images/arequipe.jpg'
 import cafe from '../../assets/images/cafe.jpg'
 import chocolate from '../../assets/images/chocolate.jpg'
@@ -15,100 +14,6 @@ import oreo from '../../assets/images/oreo.jpg'
 import tiramisu from '../../assets/images/tiramisu.png'
 import tres_leches from '../../assets/images/tres_leches.jpg'
 
-const INITIAL_PRODUCTS = [
-  {
-    id: 1,
-    nombre: 'Mousse Individual de Arequipe',
-    categoria: 'Postres Individuales',
-    precio: 9500,
-    descripcion: 'Porción personal en domo con cremosa mousse de dulce de leche y nuez.',
-    estado: 'Activo',
-    imagen: arequipe
-  },
-  {
-    id: 2,
-    nombre: 'Vasitos de Postre Moka y Café',
-    categoria: 'Vasitos Gourmet',
-    precio: 8500,
-    descripcion: 'Capas de crema suave al café con cacao puro y virutas de chocolate.',
-    estado: 'Activo',
-    imagen: cafe
-  },
-  {
-    id: 3,
-    nombre: 'Tarta Suprema de Chocolate',
-    categoria: 'Tortas y Pasteles',
-    precio: 65000,
-    descripcion: 'Bizcocho húmedo de cacao con ganache oscuro y detalle dorado.',
-    estado: 'Activo',
-    imagen: chocolate
-  },
-  {
-    id: 4,
-    nombre: 'Cheesecake Horneado de Durazno',
-    categoria: 'Cheesecakes',
-    precio: 58000,
-    descripcion: 'Base de queso horneado al estilo clásico sobre galleta con durazno.',
-    estado: 'Activo',
-    imagen: durazno
-  },
-  {
-    id: 5,
-    nombre: 'Flan Casero al Caramelo',
-    categoria: 'Tradicionales',
-    precio: 35000,
-    descripcion: 'Receta tradicional de textura sedosa y generoso caramelo líquido.',
-    estado: 'Activo',
-    imagen: flan
-  },
-  {
-    id: 6,
-    nombre: 'Panna Cotta con Frutos Rojos',
-    categoria: 'Postres Individuales',
-    precio: 11000,
-    descripcion: 'Crema cocida aromatizada con vainilla y salsa brillante de fresa.',
-    estado: 'Activo',
-    imagen: fresa
-  },
-  {
-    id: 7,
-    nombre: 'Pie Cítrico de Maracuyá',
-    categoria: 'Tortas y Pasteles',
-    precio: 52000,
-    descripcion: 'Tarta artesanal con relleno de maracuyá y coulis natural con semillas.',
-    estado: 'Activo',
-    imagen: maracuya
-  },
-  {
-    id: 8,
-    nombre: 'Domo Cheesecake de Oreo',
-    categoria: 'Postres Individuales',
-    precio: 9500,
-    descripcion: 'Postre individual con base de galleta Oreo y crema batida.',
-    estado: 'Activo',
-    imagen: oreo
-  },
-  {
-    id: 9,
-    nombre: 'Tiramisú Artesanal con Nueces',
-    categoria: 'Vasitos Gourmet',
-    precio: 12000,
-    descripcion: 'Copas individuales con crema mascarpone, café y nueces tostadas.',
-    estado: 'Activo',
-    imagen: tiramisu
-  },
-  {
-    id: 10,
-    nombre: 'Pastel Clásico Tres Leches',
-    categoria: 'Tortas y Pasteles',
-    precio: 60000,
-    descripcion: 'Bizcocho tradicional humedecido en salsa tres leches y chantilly.',
-    estado: 'Activo',
-    imagen: tres_leches
-  }
-]
-
-// Mapa de imágenes locales
 const productImagesMap = {
   arequipe,
   cafe,
@@ -122,20 +27,52 @@ const productImagesMap = {
   tres_leches
 }
 
+const IMAGE_PRESETS = [
+  { label: 'Torta de Chocolate', value: '/src/assets/images/chocolate.jpg' },
+  { label: 'Torta de Arequipe', value: '/src/assets/images/arequipe.jpg' },
+  { label: 'Café Moka', value: '/src/assets/images/cafe.jpg' },
+  { label: 'Cheesecake Durazno', value: '/src/assets/images/durazno.png' },
+  { label: 'Flan Tradicional', value: '/src/assets/images/flan.jpg' },
+  { label: 'Fresas', value: '/src/assets/images/fresa.jpg' },
+  { label: 'Maracuyá', value: '/src/assets/images/maracuya.jpg' },
+  { label: 'Galletas Oreo', value: '/src/assets/images/oreo.jpg' },
+  { label: 'Tiramisú', value: '/src/assets/images/tiramisu.png' },
+  { label: 'Tres Leches', value: '/src/assets/images/tres_leches.jpg' }
+]
+
 function resolveProductImage(url) {
   if (!url) return chocolate
   for (const key of Object.keys(productImagesMap)) {
     if (url.includes(key)) return productImagesMap[key]
   }
-  return chocolate
+  return url.startsWith('http') ? url : chocolate
+}
+
+function mapApiProduct(p) {
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    categoria_id: p.categoria_id,
+    categoria: p.categoria?.nombre || 'Sin categoría',
+    precio: Number(p.precio),
+    stock: Number(p.stock ?? 0),
+    descripcion: p.descripcion,
+    imagen_url: p.imagen_url || '/src/assets/images/chocolate.jpg',
+    imagen: resolveProductImage(p.imagen_url),
+    activo: Boolean(p.activo),
+    estado: p.activo ? 'Activo' : 'Inactivo'
+  }
 }
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [statusFilter, setStatusFilter] = useState('Todos')
-  const [isConnectedToApi, setIsConnectedToApi] = useState(false)
 
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -152,61 +89,45 @@ export default function AdminProducts() {
   // Formulario
   const [formData, setFormData] = useState({
     nombre: '',
-    categoria: 'Tortas y Pasteles',
+    categoria_id: '',
     precio: '',
+    stock: '10',
     descripcion: '',
+    imagen_url: '/src/assets/images/chocolate.jpg',
     estado: 'Activo'
   })
 
-  // Cargar productos desde FastAPI / Neon o localStorage
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const res = await productService.getAll({ solo_activos: false })
-        if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-          const apiProducts = res.data.map((p) => ({
-            id: p.id,
-            nombre: p.nombre,
-            categoria: p.categoria?.nombre || 'Tortas y Pasteles',
-            precio: Number(p.precio),
-            descripcion: p.descripcion,
-            estado: p.activo ? 'Activo' : 'Inactivo',
-            imagen: resolveProductImage(p.imagen_url)
-          }))
-          setProducts(apiProducts)
-          setIsConnectedToApi(true)
-          return
-        }
-      } catch (e) {
-        // Fallback
-      }
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setApiError('')
 
-      const stored = localStorage.getItem('dulce_delicia_products_crud')
-      if (stored) {
-        try {
-          setProducts(JSON.parse(stored))
-        } catch (e) {
-          setProducts(INITIAL_PRODUCTS)
-        }
-      } else {
-        setProducts(INITIAL_PRODUCTS)
-        localStorage.setItem('dulce_delicia_products_crud', JSON.stringify(INITIAL_PRODUCTS))
-      }
+    const [pRes, cRes] = await Promise.all([
+      productService.getAll({ solo_activos: false }),
+      categoryService.getAll()
+    ])
+
+    if (cRes.ok && Array.isArray(cRes.data)) {
+      setCategories(cRes.data)
     }
-    loadProducts()
+
+    if (pRes.ok && Array.isArray(pRes.data)) {
+      setProducts(pRes.data.map(mapApiProduct))
+    } else {
+      setApiError(pRes.error || 'No fue posible cargar el catálogo de productos desde la API.')
+    }
+    setLoading(false)
   }, [])
 
-  const saveProducts = (newList) => {
-    setProducts(newList)
-    localStorage.setItem('dulce_delicia_products_crud', JSON.stringify(newList))
-  }
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Filtrado
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCat = categoryFilter === 'Todas' || p.categoria === categoryFilter
+    const matchesCat = categoryFilter === 'Todas' || String(p.categoria_id) === String(categoryFilter)
     const matchesStatus = statusFilter === 'Todos' || p.estado === statusFilter
     return matchesSearch && matchesCat && matchesStatus
   })
@@ -217,9 +138,11 @@ export default function AdminProducts() {
     setSelectedProduct(null)
     setFormData({
       nombre: '',
-      categoria: 'Tortas y Pasteles',
+      categoria_id: categories[0]?.id ? String(categories[0].id) : '',
       precio: '',
+      stock: '10',
       descripcion: '',
+      imagen_url: '/src/assets/images/chocolate.jpg',
       estado: 'Activo'
     })
     setIsModalOpen(true)
@@ -231,24 +154,28 @@ export default function AdminProducts() {
     setSelectedProduct(product)
     setFormData({
       nombre: product.nombre,
-      categoria: product.categoria,
-      precio: product.precio,
+      categoria_id: String(product.categoria_id),
+      precio: String(product.precio),
+      stock: String(product.stock ?? 0),
       descripcion: product.descripcion,
+      imagen_url: product.imagen_url || '/src/assets/images/chocolate.jpg',
       estado: product.estado
     })
     setIsModalOpen(true)
   }
 
-  // Guardar Producto
-  const handleSaveProduct = (e) => {
+  // Guardar Producto vía FastAPI
+  const handleSaveProduct = async (e) => {
     e.preventDefault()
 
     const nombreTrim = formData.nombre.trim()
     const descTrim = formData.descripcion.trim()
     const numPrecio = Number(formData.precio)
+    const numStock = Number(formData.stock)
+    const catId = Number(formData.categoria_id)
 
-    if (!nombreTrim || !descTrim || !formData.precio) {
-      setToast({ message: 'Todos los campos son obligatorios y no pueden ser solo espacios.', type: 'error' })
+    if (!nombreTrim || !descTrim || !formData.precio || !catId) {
+      setToast({ message: 'Todos los campos son obligatorios.', type: 'error' })
       return
     }
 
@@ -257,47 +184,67 @@ export default function AdminProducts() {
       return
     }
 
+    if (isNaN(numStock) || numStock < 0) {
+      setToast({ message: 'El stock no puede ser negativo.', type: 'error' })
+      return
+    }
+
+    setSaving(true)
+    const payload = {
+      nombre: nombreTrim,
+      descripcion: descTrim,
+      precio: numPrecio,
+      stock: numStock,
+      categoria_id: catId,
+      imagen_url: formData.imagen_url.trim() || '/src/assets/images/chocolate.jpg',
+      activo: formData.estado === 'Activo'
+    }
+
     if (isEditing && selectedProduct) {
-      const updated = products.map((p) =>
-        p.id === selectedProduct.id
-          ? { ...p, ...formData, nombre: nombreTrim, descripcion: descTrim, precio: numPrecio }
-          : p
-      )
-      saveProducts(updated)
-      setToast({ message: `Postre "${nombreTrim}" actualizado correctamente.`, type: 'success' })
-    } else {
-      const newProduct = {
-        ...formData,
-        id: Date.now(),
-        nombre: nombreTrim,
-        descripcion: descTrim,
-        precio: numPrecio,
-        imagen: chocolate // Imagen por defecto
+      const res = await productService.update(selectedProduct.id, payload)
+      setSaving(false)
+
+      if (!res.ok) {
+        setToast({ message: res.error || 'No fue posible actualizar el postre.', type: 'error' })
+        return
       }
-      saveProducts([newProduct, ...products])
-      setToast({ message: `Postre "${nombreTrim}" agregado al catálogo.`, type: 'success' })
+
+      const mapped = mapApiProduct(res.data)
+      setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? mapped : p)))
+      setToast({ message: `Postre "${mapped.nombre}" actualizado en base de datos.`, type: 'success' })
+    } else {
+      const res = await productService.create(payload)
+      setSaving(false)
+
+      if (!res.ok) {
+        setToast({ message: res.error || 'No fue posible crear el postre.', type: 'error' })
+        return
+      }
+
+      const mapped = mapApiProduct(res.data)
+      setProducts((prev) => [mapped, ...prev])
+      setToast({ message: `Postre "${mapped.nombre}" guardado en el catálogo.`, type: 'success' })
     }
 
     setIsModalOpen(false)
   }
 
-  // Alternar Estado
+  // Alternar Estado en FastAPI
   const handleToggleStatus = async (productId) => {
     const target = products.find((p) => p.id === productId)
-    const nuevoEstado = target?.estado === 'Activo' ? 'Inactivo' : 'Activo'
+    if (!target) return
 
-    if (isConnectedToApi && target) {
-      await productService.update(productId, { activo: nuevoEstado === 'Activo' })
+    const nuevoActivo = !target.activo
+    const res = await productService.update(productId, { activo: nuevoActivo })
+
+    if (!res.ok) {
+      setToast({ message: res.error || 'No fue posible cambiar la disponibilidad.', type: 'error' })
+      return
     }
 
-    const updated = products.map((p) => {
-      if (p.id === productId) {
-        setToast({ message: `Disponibilidad de "${p.nombre}" cambiada a ${nuevoEstado}.`, type: 'success' })
-        return { ...p, estado: nuevoEstado }
-      }
-      return p
-    })
-    saveProducts(updated)
+    const mapped = mapApiProduct(res.data)
+    setProducts((prev) => prev.map((p) => (p.id === productId ? mapped : p)))
+    setToast({ message: `Disponibilidad de "${mapped.nombre}" cambiada a ${mapped.estado}.`, type: 'success' })
   }
 
   // Confirmación de Borrado
@@ -308,20 +255,30 @@ export default function AdminProducts() {
 
   const handleConfirmDelete = async () => {
     if (!productToDelete) return
-    if (isConnectedToApi) {
-      await productService.delete(productToDelete.id)
-    }
-    const updated = products.filter((p) => p.id !== productToDelete.id)
-    saveProducts(updated)
+    const res = await productService.delete(productToDelete.id)
     setIsConfirmDeleteOpen(false)
-    setToast({ message: `El postre "${productToDelete.nombre}" ha sido eliminado del catálogo.`, type: 'success' })
+
+    if (!res.ok) {
+      setToast({ message: res.error || 'No fue posible eliminar el postre.', type: 'error' })
+      setProductToDelete(null)
+      return
+    }
+
+    if (res.data?.desactivado) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productToDelete.id ? { ...p, activo: false, estado: 'Inactivo' } : p))
+      )
+    } else {
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id))
+    }
+
+    setToast({ message: res.data?.message || 'Operación completada.', type: 'success' })
     setProductToDelete(null)
   }
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-6xl mx-auto">
-      
-      {/* Toast Alert */}
+
       <ToastAlert
         message={toast.message}
         type={toast.type}
@@ -331,21 +288,11 @@ export default function AdminProducts() {
       {/* Cabecera */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="font-display text-2xl font-bold text-logo-brown">
-              Catálogo de Postres y Especialidades
-            </h2>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-              isConnectedToApi 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isConnectedToApi ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
-              {isConnectedToApi ? 'Neon Tech API' : 'Modo Local'}
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-logo-brownLight font-light">
-            Administra los postres, ajusta precios, controla la disponibilidad en tienda y agrega nuevas creaciones.
+          <h2 className="font-display text-2xl font-bold text-logo-brown">
+            Catálogo de Postres y Especialidades
+          </h2>
+          <p className="text-xs sm:text-sm text-logo-brownLight font-light mt-1">
+            Administra los postres, ajusta precios, stock y disponibilidad de las creaciones artesanales.
           </p>
         </div>
 
@@ -358,6 +305,19 @@ export default function AdminProducts() {
           <span>Agregar Nuevo Postre</span>
         </button>
       </div>
+
+      {apiError && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-center justify-between gap-3">
+          <span>{apiError}</span>
+          <button
+            type="button"
+            onClick={loadData}
+            className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-semibold"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-logo-pink/20 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
@@ -381,11 +341,9 @@ export default function AdminProducts() {
             className="px-3 py-2 rounded-xl border border-logo-pink/30 text-xs text-logo-brown bg-white outline-none focus:border-logo-pink"
           >
             <option value="Todas">Todas las Categorías</option>
-            <option value="Tortas y Pasteles">Tortas y Pasteles</option>
-            <option value="Cheesecakes">Cheesecakes</option>
-            <option value="Vasitos Gourmet">Vasitos Gourmet</option>
-            <option value="Postres Individuales">Postres Individuales</option>
-            <option value="Tradicionales">Tradicionales</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.nombre}</option>
+            ))}
           </select>
 
           <select
@@ -400,7 +358,7 @@ export default function AdminProducts() {
         </div>
       </div>
 
-      {/* Tabla CRUD de Productos (Read) */}
+      {/* Tabla CRUD de Productos */}
       <div className="bg-white rounded-3xl border border-logo-pink/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -409,16 +367,21 @@ export default function AdminProducts() {
                 <th className="py-3.5 px-4 sm:px-6">Postre</th>
                 <th className="py-3.5 px-4">Categoría</th>
                 <th className="py-3.5 px-4">Precio COP</th>
+                <th className="py-3.5 px-4">Stock</th>
                 <th className="py-3.5 px-4">Disponibilidad</th>
                 <th className="py-3.5 px-4 sm:px-6 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-logo-pink/10">
-              {filteredProducts.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">
+                    Cargando productos desde FastAPI...
+                  </td>
+                </tr>
+              ) : filteredProducts.length > 0 ? (
                 filteredProducts.map((p) => (
                   <tr key={p.id} className="hover:bg-logo-vanilla/40 transition-colors">
-                    
-                    {/* Postre con Imagen Miniatura */}
                     <td className="py-3.5 px-4 sm:px-6">
                       <div className="flex items-center gap-3">
                         <img
@@ -433,19 +396,20 @@ export default function AdminProducts() {
                       </div>
                     </td>
 
-                    {/* Categoría */}
                     <td className="py-3.5 px-4 text-gray-600">
                       <span className="px-2 py-0.5 rounded-md bg-logo-cream border border-logo-pink/20 text-[11px]">
                         {p.categoria}
                       </span>
                     </td>
 
-                    {/* Precio Formateado */}
                     <td className="py-3.5 px-4 font-semibold text-logo-brown">
                       ${Number(p.precio).toLocaleString('es-CO')}
                     </td>
 
-                    {/* Estado Activo / Inactivo */}
+                    <td className="py-3.5 px-4 text-gray-700 font-medium">
+                      {p.stock} uds
+                    </td>
+
                     <td className="py-3.5 px-4">
                       <button
                         type="button"
@@ -462,7 +426,6 @@ export default function AdminProducts() {
                       </button>
                     </td>
 
-                    {/* Acciones */}
                     <td className="py-3.5 px-4 sm:px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -483,13 +446,12 @@ export default function AdminProducts() {
                         </button>
                       </div>
                     </td>
-
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-gray-500">
-                    No se encontraron postres en esta categoría.
+                  <td colSpan={6} className="py-8 text-center text-gray-500">
+                    No se encontraron postres con los filtros seleccionados.
                   </td>
                 </tr>
               )}
@@ -501,7 +463,7 @@ export default function AdminProducts() {
       {/* Modal Crear / Editar Producto */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-logo-brown/60 backdrop-blur-sm animate-fadeIn">
-          <div 
+          <div
             className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-logo-pink/30 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -531,19 +493,18 @@ export default function AdminProducts() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-3 sm:col-span-1">
                   <label className="block text-xs font-semibold text-logo-brown mb-1">Categoría *</label>
                   <select
-                    value={formData.categoria}
-                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                    value={formData.categoria_id}
+                    onChange={(e) => setFormData({ ...formData, categoria_id: e.target.value })}
+                    required
                     className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink"
                   >
-                    <option value="Tortas y Pasteles">Tortas y Pasteles</option>
-                    <option value="Cheesecakes">Cheesecakes</option>
-                    <option value="Vasitos Gourmet">Vasitos Gourmet</option>
-                    <option value="Postres Individuales">Postres Individuales</option>
-                    <option value="Tradicionales">Tradicionales</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={String(c.id)}>{c.nombre}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -551,12 +512,24 @@ export default function AdminProducts() {
                   <label className="block text-xs font-semibold text-logo-brown mb-1">Precio (COP) *</label>
                   <input
                     type="number"
-                    min="1000"
-                    step="500"
+                    min="500"
+                    step="100"
                     value={formData.precio}
                     onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                     required
-                    placeholder="Ej. 45000"
+                    placeholder="45000"
+                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-logo-brown mb-1">Stock *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    required
                     className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
                   />
                 </div>
@@ -574,16 +547,31 @@ export default function AdminProducts() {
                 ></textarea>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-logo-brown mb-1">Disponibilidad en Carta</label>
-                <select
-                  value={formData.estado}
-                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink font-semibold"
-                >
-                  <option value="Activo">Disponible (Activo)</option>
-                  <option value="Inactivo">Agotado (Inactivo)</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-logo-brown mb-1">Imagen del Catálogo</label>
+                  <select
+                    value={formData.imagen_url}
+                    onChange={(e) => setFormData({ ...formData, imagen_url: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink"
+                  >
+                    {IMAGE_PRESETS.map((img) => (
+                      <option key={img.value} value={img.value}>{img.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-logo-brown mb-1">Disponibilidad en Carta</label>
+                  <select
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink font-semibold"
+                  >
+                    <option value="Activo">Disponible (Activo)</option>
+                    <option value="Inactivo">Agotado (Inactivo)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-logo-pink/20">
@@ -596,9 +584,10 @@ export default function AdminProducts() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-logo-pink hover:bg-logo-pinkHover text-white text-xs font-semibold shadow-md transition-all"
+                  disabled={saving}
+                  className="px-6 py-2 rounded-full bg-logo-pink hover:bg-logo-pinkHover text-white text-xs font-semibold shadow-md transition-all disabled:opacity-50"
                 >
-                  {isEditing ? 'Guardar Cambios' : 'Agregar Postre'}
+                  {saving ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Agregar Postre'}
                 </button>
               </div>
             </form>
@@ -606,7 +595,6 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Modal Confirmación de Eliminación con Bloqueo de 3s y Desglose */}
       <ConfirmModal
         isOpen={isConfirmDeleteOpen}
         title="¿Eliminar definitivamente este postre del catálogo?"

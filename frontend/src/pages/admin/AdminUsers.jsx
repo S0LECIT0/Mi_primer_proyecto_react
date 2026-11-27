@@ -1,71 +1,45 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import ToastAlert from '../../components/admin/ToastAlert'
 import { userService } from '../../services/api'
 
-const INITIAL_USERS = [
-  {
-    id: 1,
-    nombre: 'Valentina',
-    apellido: 'Gómez Restrepo',
-    correo: 'admin@dulcedelicia.com',
-    telefono: '+57 312 890 4521',
-    tipoDocumento: 'CC',
-    numeroDocumento: '1020304050',
-    rol: 'Administrador',
-    estado: 'Activo',
-    fechaRegistro: '2026-11-20'
-  },
-  {
-    id: 2,
-    nombre: 'Santiago',
-    apellido: 'Montoya Pérez',
-    correo: 'repostero@dulcedelicia.com',
-    telefono: '+57 300 456 7890',
-    tipoDocumento: 'CC',
-    numeroDocumento: '1098765432',
-    rol: 'Empleado',
-    estado: 'Activo',
-    fechaRegistro: '2026-11-21'
-  },
-  {
-    id: 3,
-    nombre: 'Carolina',
-    apellido: 'Duque Morales',
-    correo: 'carolina.cliente@gmail.com',
-    telefono: '+57 315 111 2233',
-    tipoDocumento: 'CC',
-    numeroDocumento: '1035987612',
-    rol: 'Cliente',
-    estado: 'Activo',
-    fechaRegistro: '2026-11-22'
-  },
-  {
-    id: 4,
-    nombre: 'Mateo',
-    apellido: 'Jaramillo Castro',
-    correo: 'mateo.cliente@outlook.com',
-    telefono: '+57 320 999 8877',
-    tipoDocumento: 'CC',
-    numeroDocumento: '1044556677',
-    rol: 'Cliente',
-    estado: 'Inactivo',
-    fechaRegistro: '2026-11-23'
+function mapApiUser(u) {
+  return {
+    id: u.id,
+    nombre: u.nombre,
+    apellido: u.apellido,
+    correo: u.email,
+    telefono: u.telefono || '',
+    direccion: u.direccion || '',
+    tipoDocumento: u.tipo_documento || 'CC',
+    numeroDocumento: u.numero_documento,
+    rol_id: u.rol_id,
+    rol: u.rol?.nombre || (u.rol_id === 1 ? 'Administrador' : u.rol_id === 2 ? 'Empleado' : 'Cliente'),
+    activo: u.activo,
+    estado: u.activo ? 'Activo' : 'Inactivo',
+    fechaRegistro: u.fecha_registro ? u.fecha_registro.split('T')[0] : ''
   }
-]
+}
 
 export default function AdminUsers() {
+  const { currentUser } = useOutletContext() || {}
+  const isAdmin = currentUser?.rol === 'Administrador'
+
   const [users, setUsers] = useState([])
+  const [roles, setRoles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('Todos')
   const [statusFilter, setStatusFilter] = useState('Todos')
-  const [isConnectedToApi, setIsConnectedToApi] = useState(false)
 
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
-  
+
   // Modal de Confirmación de Eliminación
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
@@ -79,57 +53,53 @@ export default function AdminUsers() {
     apellido: '',
     correo: '',
     telefono: '',
+    direccion: '',
     tipoDocumento: 'CC',
     numeroDocumento: '',
-    rol: 'Cliente',
+    password: '',
+    rol_id: 3,
     estado: 'Activo'
   })
 
-  // Cargar usuarios desde FastAPI / Neon o localStorage
-  useEffect(() => {
-    async function loadUsers() {
-      try {
-        const res = await userService.getAll()
-        if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-          const apiUsers = res.data.map((u) => ({
-            id: u.id,
-            nombre: u.nombre,
-            apellido: u.apellido,
-            correo: u.email,
-            telefono: u.telefono || '',
-            tipoDocumento: u.tipo_documento || 'CC',
-            numeroDocumento: u.numero_documento,
-            rol: u.rol?.nombre || (u.rol_id === 1 ? 'Administrador' : u.rol_id === 2 ? 'Empleado' : 'Cliente'),
-            estado: u.activo ? 'Activo' : 'Inactivo',
-            fechaRegistro: u.fecha_registro ? u.fecha_registro.split('T')[0] : '2026-11-26'
-          }))
-          setUsers(apiUsers)
-          setIsConnectedToApi(true)
-          return
-        }
-      } catch (err) {
-        // Fallback local
-      }
-
-      const stored = localStorage.getItem('dulce_delicia_users_crud')
-      if (stored) {
-        try {
-          setUsers(JSON.parse(stored))
-        } catch (e) {
-          setUsers(INITIAL_USERS)
-        }
-      } else {
-        setUsers(INITIAL_USERS)
-        localStorage.setItem('dulce_delicia_users_crud', JSON.stringify(INITIAL_USERS))
-      }
+  const loadData = useCallback(async () => {
+    if (!isAdmin) {
+      setLoading(false)
+      return
     }
-    loadUsers()
-  }, [])
+    setLoading(true)
+    setApiError('')
 
-  // Guardar en localStorage cada vez que cambien los usuarios
-  const saveUsers = (newUsersList) => {
-    setUsers(newUsersList)
-    localStorage.setItem('dulce_delicia_users_crud', JSON.stringify(newUsersList))
+    const [uRes, rRes] = await Promise.all([
+      userService.getAll(),
+      userService.getRoles()
+    ])
+
+    if (rRes.ok && Array.isArray(rRes.data)) {
+      setRoles(rRes.data)
+    }
+
+    if (uRes.ok && Array.isArray(uRes.data)) {
+      setUsers(uRes.data.map(mapApiUser))
+    } else {
+      setApiError(uRes.error || 'No fue posible cargar la lista de usuarios desde la API.')
+    }
+    setLoading(false)
+  }, [isAdmin])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  if (!isAdmin) {
+    return (
+      <div className="max-w-xl mx-auto mt-10 p-6 bg-white rounded-3xl border border-rose-200 text-center space-y-2">
+        <span className="text-3xl block">🔒</span>
+        <h2 className="font-display text-xl font-bold text-logo-brown">Acceso Restringido</h2>
+        <p className="text-xs sm:text-sm text-logo-brownLight">
+          Solo los usuarios con rol de Administrador pueden gestionar las cuentas y roles del sistema.
+        </p>
+      </div>
+    )
   }
 
   // Filtrado en tiempo real
@@ -152,9 +122,11 @@ export default function AdminUsers() {
       apellido: '',
       correo: '',
       telefono: '',
+      direccion: '',
       tipoDocumento: 'CC',
       numeroDocumento: '',
-      rol: 'Cliente',
+      password: '',
+      rol_id: 3,
       estado: 'Activo'
     })
     setIsModalOpen(true)
@@ -169,25 +141,27 @@ export default function AdminUsers() {
       apellido: user.apellido,
       correo: user.correo,
       telefono: user.telefono,
+      direccion: user.direccion || '',
       tipoDocumento: user.tipoDocumento,
       numeroDocumento: user.numeroDocumento,
-      rol: user.rol,
+      password: '',
+      rol_id: user.rol_id,
       estado: user.estado
     })
     setIsModalOpen(true)
   }
 
-  // Guardar (Crear o Actualizar)
-  const handleSaveUser = (e) => {
+  // Guardar (Crear o Actualizar vía FastAPI)
+  const handleSaveUser = async (e) => {
     e.preventDefault()
 
-    // Validaciones estrictas: no números en nombre/apellido, no solo espacios
     const nombreTrim = formData.nombre.trim()
     const apellidoTrim = formData.apellido.trim()
-    const correoTrim = formData.correo.trim()
+    const correoTrim = formData.correo.trim().toLowerCase()
+    const docTrim = formData.numeroDocumento.trim()
 
-    if (!nombreTrim || !apellidoTrim || !correoTrim || !formData.numeroDocumento.trim()) {
-      setToast({ message: 'Todos los campos marcados son obligatorios y no pueden ser solo espacios.', type: 'error' })
+    if (!nombreTrim || !apellidoTrim || !correoTrim || !docTrim) {
+      setToast({ message: 'Todos los campos marcados son obligatorios.', type: 'error' })
       return
     }
 
@@ -201,74 +175,132 @@ export default function AdminUsers() {
       return
     }
 
+    if (!isEditing && formData.password.length < 8) {
+      setToast({ message: 'La contraseña debe tener al menos 8 caracteres.', type: 'error' })
+      return
+    }
+
+    if (isEditing && formData.password && formData.password.length < 8) {
+      setToast({ message: 'Si cambias la contraseña, debe tener al menos 8 caracteres.', type: 'error' })
+      return
+    }
+
+    setSaving(true)
+
     if (isEditing && selectedUser) {
-      // Actualizar usuario existente
-      const updated = users.map((u) =>
-        u.id === selectedUser.id
-          ? { ...u, ...formData, nombre: nombreTrim, apellido: apellidoTrim, correo: correoTrim }
-          : u
-      )
-      saveUsers(updated)
-      setToast({ message: `Usuario ${nombreTrim} actualizado con éxito.`, type: 'success' })
-    } else {
-      // Crear nuevo usuario
-      const newUser = {
-        ...formData,
-        id: Date.now(),
+      const payload = {
         nombre: nombreTrim,
         apellido: apellidoTrim,
-        correo: correoTrim,
-        fechaRegistro: new Date().toISOString().split('T')[0]
+        email: correoTrim,
+        telefono: formData.telefono.trim() || null,
+        direccion: formData.direccion.trim() || null,
+        tipo_documento: formData.tipoDocumento,
+        numero_documento: docTrim,
+        rol_id: Number(formData.rol_id),
+        activo: formData.estado === 'Activo'
       }
-      saveUsers([newUser, ...users])
-      setToast({ message: `Nuevo usuario ${nombreTrim} creado exitosamente.`, type: 'success' })
+      if (formData.password) {
+        payload.password = formData.password
+      }
+
+      const res = await userService.update(selectedUser.id, payload)
+      setSaving(false)
+
+      if (!res.ok) {
+        setToast({ message: res.error || 'No fue posible actualizar el usuario.', type: 'error' })
+        return
+      }
+
+      const mapped = mapApiUser(res.data)
+      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? mapped : u)))
+      setToast({ message: `Usuario ${mapped.nombre} actualizado en base de datos.`, type: 'success' })
+    } else {
+      const payload = {
+        nombre: nombreTrim,
+        apellido: apellidoTrim,
+        email: correoTrim,
+        telefono: formData.telefono.trim() || null,
+        direccion: formData.direccion.trim() || null,
+        tipo_documento: formData.tipoDocumento,
+        numero_documento: docTrim,
+        password: formData.password,
+        rol_id: Number(formData.rol_id),
+        activo: formData.estado === 'Activo'
+      }
+
+      const res = await userService.create(payload)
+      setSaving(false)
+
+      if (!res.ok) {
+        setToast({ message: res.error || 'No fue posible crear el usuario.', type: 'error' })
+        return
+      }
+
+      const mapped = mapApiUser(res.data)
+      setUsers((prev) => [...prev, mapped])
+      setToast({ message: `Usuario ${mapped.nombre} creado y guardado en base de datos.`, type: 'success' })
     }
 
     setIsModalOpen(false)
   }
 
-  // Cambiar estado Activo / Inactivo con un clic
+  // Cambiar estado Activo / Inactivo en FastAPI
   const handleToggleStatus = async (userId) => {
     const targetUser = users.find((u) => u.id === userId)
-    const nuevoEstado = targetUser?.estado === 'Activo' ? 'Inactivo' : 'Activo'
+    if (!targetUser) return
 
-    if (isConnectedToApi && targetUser) {
-      await userService.update(userId, { activo: nuevoEstado === 'Activo' })
+    const nuevoActivo = !targetUser.activo
+    const res = await userService.update(userId, { activo: nuevoActivo })
+
+    if (!res.ok) {
+      setToast({ message: res.error || 'Error al actualizar el estado del usuario.', type: 'error' })
+      return
     }
 
-    const updated = users.map((u) => {
-      if (u.id === userId) {
-        setToast({ message: `Estado de ${u.nombre} cambiado a ${nuevoEstado}.`, type: 'success' })
-        return { ...u, estado: nuevoEstado }
-      }
-      return u
-    })
-    saveUsers(updated)
+    const mapped = mapApiUser(res.data)
+    setUsers((prev) => prev.map((u) => (u.id === userId ? mapped : u)))
+    setToast({ message: `Estado de ${mapped.nombre} cambiado a ${mapped.estado}.`, type: 'success' })
   }
 
-  // Solicitar confirmación de eliminación
   const handleRequestDelete = (user) => {
     setUserToDelete(user)
     setIsConfirmDeleteOpen(true)
   }
 
-  // Confirmar eliminación
   const handleConfirmDelete = async () => {
     if (!userToDelete) return
-    if (isConnectedToApi) {
-      await userService.delete(userToDelete.id)
-    }
-    const updated = users.filter((u) => u.id !== userToDelete.id)
-    saveUsers(updated)
+    const res = await userService.delete(userToDelete.id)
     setIsConfirmDeleteOpen(false)
-    setToast({ message: `El usuario ${userToDelete.nombre} ${userToDelete.apellido} ha sido eliminado.`, type: 'success' })
+
+    if (!res.ok) {
+      setToast({ message: res.error || 'No fue posible eliminar el usuario.', type: 'error' })
+      setUserToDelete(null)
+      return
+    }
+
+    if (res.data?.desactivado) {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userToDelete.id ? { ...u, activo: false, estado: 'Inactivo' } : u))
+      )
+    } else {
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id))
+    }
+
+    setToast({ message: res.data?.message || 'Operación completada.', type: 'success' })
     setUserToDelete(null)
   }
 
+  const availableRoles = roles.length > 0
+    ? roles
+    : [
+        { id: 1, nombre: 'Administrador' },
+        { id: 2, nombre: 'Empleado' },
+        { id: 3, nombre: 'Cliente' }
+      ]
+
   return (
     <div className="space-y-6 animate-fadeIn max-w-6xl mx-auto">
-      
-      {/* Toast Alert */}
+
       <ToastAlert
         message={toast.message}
         type={toast.type}
@@ -282,7 +314,7 @@ export default function AdminUsers() {
             Gestión de Usuarios y Roles
           </h2>
           <p className="text-xs sm:text-sm text-logo-brownLight font-light">
-            Crea, actualiza, asigna roles y gestiona permisos del personal y clientes de Dulce Delicia.
+            Crea, actualiza, asigna roles y gestiona permisos del personal y clientes en la base de datos.
           </p>
         </div>
 
@@ -296,9 +328,21 @@ export default function AdminUsers() {
         </button>
       </div>
 
-      {/* Barra de Filtros y Búsqueda en Tiempo Real */}
+      {apiError && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-center justify-between gap-3">
+          <span>{apiError}</span>
+          <button
+            type="button"
+            onClick={loadData}
+            className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-semibold"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {/* Barra de Filtros y Búsqueda */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-logo-pink/20 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Buscador */}
         <div className="relative w-full md:w-80">
           <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
             🔍
@@ -312,7 +356,6 @@ export default function AdminUsers() {
           />
         </div>
 
-        {/* Filtros de Rol y Estado */}
         <div className="flex items-center gap-2.5 w-full md:w-auto">
           <select
             value={roleFilter}
@@ -320,9 +363,9 @@ export default function AdminUsers() {
             className="px-3 py-2 rounded-xl border border-logo-pink/30 text-xs text-logo-brown bg-white outline-none focus:border-logo-pink"
           >
             <option value="Todos">Todos los Roles</option>
-            <option value="Administrador">Administrador</option>
-            <option value="Empleado">Empleado</option>
-            <option value="Cliente">Cliente</option>
+            {availableRoles.map((r) => (
+              <option key={r.id} value={r.nombre}>{r.nombre}</option>
+            ))}
           </select>
 
           <select
@@ -337,7 +380,7 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Tabla CRUD de Usuarios (Read) */}
+      {/* Tabla CRUD de Usuarios */}
       <div className="bg-white rounded-3xl border border-logo-pink/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -352,15 +395,19 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-logo-pink/10">
-              {filteredUsers.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">
+                    Cargando usuarios desde FastAPI...
+                  </td>
+                </tr>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-logo-vanilla/40 transition-colors">
-                    
-                    {/* Usuario */}
                     <td className="py-3.5 px-4 sm:px-6">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-logo-pink/20 text-logo-brown font-bold flex items-center justify-center text-xs shrink-0">
-                          {u.nombre[0]}
+                          {u.nombre?.[0] || 'U'}
                         </div>
                         <div>
                           <div className="font-semibold text-logo-brown">{u.nombre} {u.apellido}</div>
@@ -369,17 +416,14 @@ export default function AdminUsers() {
                       </div>
                     </td>
 
-                    {/* Documento */}
                     <td className="py-3.5 px-4 text-gray-600 font-mono text-xs">
                       {u.tipoDocumento}: {u.numeroDocumento}
                     </td>
 
-                    {/* Teléfono */}
                     <td className="py-3.5 px-4 text-gray-600">
                       {u.telefono || 'Sin teléfono'}
                     </td>
 
-                    {/* Rol */}
                     <td className="py-3.5 px-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                         u.rol === 'Administrador'
@@ -392,7 +436,6 @@ export default function AdminUsers() {
                       </span>
                     </td>
 
-                    {/* Estado con botón toggle interactivo */}
                     <td className="py-3.5 px-4">
                       <button
                         type="button"
@@ -409,10 +452,8 @@ export default function AdminUsers() {
                       </button>
                     </td>
 
-                    {/* Acciones CRUD (Editar / Eliminar) */}
                     <td className="py-3.5 px-4 sm:px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {/* Botón Editar */}
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(u)}
@@ -422,7 +463,6 @@ export default function AdminUsers() {
                           ✏️
                         </button>
 
-                        {/* Botón Eliminar */}
                         <button
                           type="button"
                           onClick={() => handleRequestDelete(u)}
@@ -433,7 +473,6 @@ export default function AdminUsers() {
                         </button>
                       </div>
                     </td>
-
                   </tr>
                 ))
               ) : (
@@ -448,10 +487,10 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Modal para Crear / Editar Usuario (Create / Update) */}
+      {/* Modal Crear / Editar Usuario */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-logo-brown/60 backdrop-blur-sm animate-fadeIn">
-          <div 
+          <div
             className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-logo-pink/30 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -535,15 +574,52 @@ export default function AdminUsers() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block text-xs font-semibold text-logo-brown mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                    placeholder="300 123 4567"
+                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-logo-brown mb-1">Dirección</label>
+                  <input
+                    type="text"
+                    value={formData.direccion}
+                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                    placeholder="Calle 10 # 20-30"
+                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-logo-brown mb-1">
+                  {isEditing ? 'Nueva Contraseña (opcional, mín. 8 caracteres)' : 'Contraseña * (mín. 8 caracteres)'}
+                </label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required={!isEditing}
+                  placeholder={isEditing ? 'Dejar vacío para conservar actual' : 'Mínimo 8 caracteres'}
+                  className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className="block text-xs font-semibold text-logo-brown mb-1">Rol en el Sistema *</label>
                   <select
-                    value={formData.rol}
-                    onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
+                    value={formData.rol_id}
+                    onChange={(e) => setFormData({ ...formData, rol_id: Number(e.target.value) })}
                     className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink font-semibold"
                   >
-                    <option value="Cliente">Cliente</option>
-                    <option value="Empleado">Empleado</option>
-                    <option value="Administrador">Administrador</option>
+                    {availableRoles.map((r) => (
+                      <option key={r.id} value={r.id}>{r.nombre}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -569,9 +645,10 @@ export default function AdminUsers() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-logo-pink hover:bg-logo-pinkHover text-white text-xs font-semibold shadow-md transition-all"
+                  disabled={saving}
+                  className="px-6 py-2 rounded-full bg-logo-pink hover:bg-logo-pinkHover text-white text-xs font-semibold shadow-md transition-all disabled:opacity-50"
                 >
-                  {isEditing ? 'Guardar Cambios' : 'Crear Usuario'}
+                  {saving ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Crear Usuario'}
                 </button>
               </div>
             </form>
@@ -579,7 +656,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* Modal de Confirmación de Eliminación (Delete) con Bloqueo de 3s y Desglose */}
       <ConfirmModal
         isOpen={isConfirmDeleteOpen}
         title="¿Eliminar definitivamente este usuario?"

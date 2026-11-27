@@ -39,11 +39,20 @@ class UsuarioCreate(UsuarioBase):
     password: str = Field(..., min_length=8)
     rol_id: Optional[int] = 3  # Por defecto: Cliente
 
+class AdminUsuarioCreate(UsuarioBase):
+    password: str = Field(..., min_length=8)
+    rol_id: int = Field(default=3, ge=1)
+    activo: bool = True
+
 class UsuarioUpdate(BaseModel):
-    nombre: Optional[str] = None
-    apellido: Optional[str] = None
+    nombre: Optional[str] = Field(None, min_length=2, max_length=100)
+    apellido: Optional[str] = Field(None, min_length=2, max_length=100)
+    tipo_documento: Optional[str] = None
+    numero_documento: Optional[str] = Field(None, min_length=5, max_length=30)
     telefono: Optional[str] = None
     direccion: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8)
     rol_id: Optional[int] = None
     activo: Optional[bool] = None
 
@@ -61,6 +70,22 @@ class UsuarioResponse(UsuarioBase):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+class RecoverPasswordRequest(BaseModel):
+    email: EmailStr
+
+class RecoverPasswordResponse(BaseModel):
+    message: str
+    email: EmailStr
+    reset_token: str
+    expires_in_minutes: int
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    new_password: str = Field(..., min_length=8)
+
+class MessageResponse(BaseModel):
+    message: str
 
 class TokenResponse(BaseModel):
     access_token: str
