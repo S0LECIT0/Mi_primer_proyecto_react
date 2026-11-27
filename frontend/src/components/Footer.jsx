@@ -85,17 +85,22 @@ export default function Footer() {
             <ul className="space-y-2 text-xs sm:text-sm text-logo-pinkLight/80">
               <li>
                 <Link to="/" className="hover:text-logo-pink transition-colors">
-                  &bull; Inicio y Catálogo
+                  • Inicio
+                </Link>
+              </li>
+              <li>
+                <Link to="/productos" className="hover:text-logo-pink transition-colors">
+                  • Catálogo de Productos
                 </Link>
               </li>
               <li>
                 <Link to="/nosotros" className="hover:text-logo-pink transition-colors">
-                  &bull; ¿Quiénes somos?
+                  • ¿Quiénes somos?
                 </Link>
               </li>
               <li>
                 <Link to="/contacto" className="hover:text-logo-pink transition-colors">
-                  &bull; Contacto y Pedidos
+                  • Contacto y Pedidos
                 </Link>
               </li>
             </ul>

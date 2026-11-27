@@ -21,7 +21,16 @@ export default {
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
         sans: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
-      }
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee 28s linear infinite',
+      },
     },
   },
   plugins: [],

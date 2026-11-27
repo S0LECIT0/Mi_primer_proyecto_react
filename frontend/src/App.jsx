@@ -4,6 +4,7 @@ import Index from './pages/Index'
 import Nosotros from './pages/Nosotros'
 import Contacto from './pages/Contacto'
 import Login from './pages/Login'
+import Productos from './pages/Productos'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
@@ -18,6 +19,7 @@ function App() {
         <Route path="/nosotros" element={<Nosotros />} />
         <Route path="/contacto" element={<Contacto />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/productos" element={<Productos />} />
 
         {/* Panel Administrativo (Módulos CRUD, Roles y Permisos) */}
         <Route path="/admin" element={<AdminLayout />}>

@@ -73,6 +73,9 @@ export default function Header() {
             <NavLink to="/" className={navLinkClass} end>
               Inicio
             </NavLink>
+            <NavLink to="/productos" className={navLinkClass}>
+              Productos
+            </NavLink>
             <NavLink to="/nosotros" className={navLinkClass}>
               ¿Quiénes somos?
             </NavLink>
@@ -152,6 +155,13 @@ export default function Header() {
             end
           >
             Inicio
+          </NavLink>
+          <NavLink
+            to="/productos"
+            onClick={() => setMobileMenuOpen(false)}
+            className={mobileNavLinkClass}
+          >
+            Productos
           </NavLink>
           <NavLink
             to="/nosotros"
