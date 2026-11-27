@@ -42,10 +42,16 @@ const IMAGE_PRESETS = [
 
 function resolveProductImage(url) {
   if (!url) return chocolate
+  // Si la URL corresponde a una imagen conocida, usar el import
   for (const key of Object.keys(productImagesMap)) {
     if (url.includes(key)) return productImagesMap[key]
   }
-  return url.startsWith('http') ? url : chocolate
+  // Si es una URL HTTP externa, usarla directamente
+  if (url.startsWith('http')) return url
+  // Si es una ruta local de assets, usarla directamente
+  if (url.startsWith('/src/assets/images/')) return url
+  // Fallback a chocolate
+  return chocolate
 }
 
 function mapApiProduct(p) {
@@ -547,31 +553,63 @@ export default function AdminProducts() {
                 ></textarea>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2.5">
                 <div>
                   <label className="block text-xs font-semibold text-logo-brown mb-1">Imagen del Catálogo</label>
                   <select
-                    value={formData.imagen_url}
-                    onChange={(e) => setFormData({ ...formData, imagen_url: e.target.value })}
+                    value={IMAGE_PRESETS.some(img => img.value === formData.imagen_url) ? formData.imagen_url : '__custom__'}
+                    onChange={(e) => {
+                      if (e.target.value !== '__custom__') {
+                        setFormData({ ...formData, imagen_url: e.target.value })
+                      } else {
+                        setFormData({ ...formData, imagen_url: '' })
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink"
                   >
                     {IMAGE_PRESETS.map((img) => (
                       <option key={img.value} value={img.value}>{img.label}</option>
                     ))}
+                    <option value="__custom__">🌐 URL personalizada…</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-logo-brown mb-1">Disponibilidad en Carta</label>
-                  <select
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink font-semibold"
-                  >
-                    <option value="Activo">Disponible (Activo)</option>
-                    <option value="Inactivo">Agotado (Inactivo)</option>
-                  </select>
+                {/* Campo de URL externa — aparece solo si se eligió "personalizada" o ya viene una URL externa */}
+                {(!IMAGE_PRESETS.some(img => img.value === formData.imagen_url)) && (
+                  <div>
+                    <label className="block text-xs font-semibold text-logo-brown mb-1">URL de la imagen <span className="text-gray-400 font-normal">(https://...)</span></label>
+                    <input
+                      type="url"
+                      value={formData.imagen_url}
+                      onChange={(e) => setFormData({ ...formData, imagen_url: e.target.value })}
+                      placeholder="https://ejemplo.com/mi-postre.jpg"
+                      className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs sm:text-sm outline-none focus:border-logo-pink"
+                    />
+                  </div>
+                )}
+
+                {/* Previsualización de imagen */}
+                <div className="flex items-center gap-3">
+                  <img
+                    src={resolveProductImage(formData.imagen_url)}
+                    alt="Vista previa"
+                    onError={(e) => { e.target.src = '' }}
+                    className="w-14 h-14 rounded-xl object-cover border border-logo-pink/30 shadow-sm shrink-0 bg-logo-cream"
+                  />
+                  <span className="text-[11px] text-gray-400 italic">Vista previa de la imagen seleccionada</span>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-logo-brown mb-1">Disponibilidad en Carta</label>
+                <select
+                  value={formData.estado}
+                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-logo-pink/30 text-xs bg-white outline-none focus:border-logo-pink font-semibold"
+                >
+                  <option value="Activo">Disponible (Activo)</option>
+                  <option value="Inactivo">Agotado (Inactivo)</option>
+                </select>
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-logo-pink/20">
